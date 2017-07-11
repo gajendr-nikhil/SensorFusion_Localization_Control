@@ -11,6 +11,8 @@ using std::vector;
  * Initializes Unscented Kalman filter
  */
 UKF::UKF() {
+  is_initialized_ = false;
+
   // if this is false, laser measurements will be ignored (except during init)
   use_laser_ = true;
 
@@ -19,9 +21,24 @@ UKF::UKF() {
 
   // initial state vector
   x_ = VectorXd(5);
+  x_.fill(0.0);
+
+  // state dimension
+  n_x_ = 5;
+
+  // augmented state dimension
+  n_aug_ = 7;
 
   // initial covariance matrix
   P_ = MatrixXd(5, 5);
+  P_ << 1, 0, 0, 0, 0,
+        0, 1, 0, 0, 0,
+        0, 0, 1, 0, 0,
+        0, 0, 0, 1, 0,
+        0, 0, 0, 0, 1;
+
+  // lambda
+  lambda_ = 3 - na_;
 
   // Process noise standard deviation longitudinal acceleration in m/s^2
   std_a_ = 30;
@@ -43,6 +60,10 @@ UKF::UKF() {
 
   // Radar measurement noise standard deviation radius change in m/s
   std_radrd_ = 0.3;
+
+  weights_ = VectorXd(2 * n_aug_ + 1);
+  weights_(0) = lambda_ / float(lambda_ + n_aug_);
+  for(int i=1; i<weights_.size(); ++i) weights_(i) = (1 / float(2 * (lambda_ + n_aug_)));
 
   /**
   TODO:
@@ -66,6 +87,18 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
   Complete this function! Make sure you switch between lidar and radar
   measurements.
   */
+  if (meas_package.sensor_type_ == MeasurementPackage::LASER)} {
+    x_ << meas_package.raw_measurements_[0], meas_package.raw_measurements_[1], 0, 0, 0;
+  }
+  else if (meas_package.sensor_type_ == MeasurementPackage::RADAR) {
+    double rho, phi;
+    rho = meas_package.raw_measurements_[0];
+    phi = meas_package.raw_measurements_[1];
+    x_ << rho * cos(phi), rho * sin(phi), 0, 0, 0;
+  }
+  previous_timestamp_ = meas_package.timestamp_;
+  previous_measurement_ = meas_package;
+  is_initialized_ = true;
 }
 
 /**
