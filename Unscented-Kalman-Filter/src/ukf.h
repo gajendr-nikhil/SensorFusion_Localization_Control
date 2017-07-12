@@ -66,9 +66,6 @@ public:
 
   ///* Sigma point spreading parameter
   double lambda_;
-  
-  ///* predicted sigma points
-  MatrixXd Xsig_pred_;
 
   ///* NIS for radar
   double NIS_radar_;
