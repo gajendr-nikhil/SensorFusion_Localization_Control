@@ -26,14 +26,14 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
 	// NOTE: Consult particle_filter.h for more information about this method (and others in this file).
 	num_particles = 100;
 	default_random_engine gen;
-	normal_distribution<double> dist_x(gps_x, std[0]);
-	normal_distribution<double> dist_y(gps_y, std[1]);
+	normal_distribution<double> dist_x(x, std[0]);
+	normal_distribution<double> dist_y(y, std[1]);
 	normal_distribution<double> dist_theta(theta, std[2]);
 	for (int i = 0; i < num_particles; i++) {
 		Particle p = {i, dist_x(gen), dist_y(gen), dist_theta(gen), 1.0};
 		particles.push_back(p);
 	}
-	weights.resize(num_particles, 1.0f);
+	weights.resize(num_particles, 1.0);
 	is_initialized = true;
 }
 
@@ -43,14 +43,14 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
 	//  http://en.cppreference.com/w/cpp/numeric/random/normal_distribution
 	//  http://www.cplusplus.com/reference/random/default_random_engine/
 	default_random_engine gen;
-	normal_distribution<double> dist_x(gps_x, std_pos[0]);
-	normal_distribution<double> dist_y(gps_y, std_pos[1]);
-	normal_distribution<double> dist_theta(theta, std_pos[2]);
+	normal_distribution<double> dist_x(0.0, std_pos[0]);
+	normal_distribution<double> dist_y(0.0, std_pos[1]);
+	normal_distribution<double> dist_theta(0.0, std_pos[2]);
 	for (int i = 0; i < num_particles; i++) {
 		if (fabs(yaw_rate) > 0.001) {
 			particles[i].x += (velocity / yaw_rate) * (sin(particles[i].theta + yaw_rate * delta_t) - sin(particles[i].theta));
 			particles[i].y += (velocity / yaw_rate) * (cos(particles[i].theta) - cos(particles[i].theta + yaw_rate * delta_t));
-			particles[i].theta += yaw_rate * delta_t
+			particles[i].theta += yaw_rate * delta_t;
 		}
 		else {
 			particles[i].x += velocity*delta_t*cos(particles[i].theta);
@@ -58,7 +58,7 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
 		}
 		particles[i].x += dist_x(gen);
 		particles[i].y += dist_y(gen);
-		particles[i].theta += dist_theta(theta);
+		particles[i].theta += dist_theta(gen);
 	}
 }
 
@@ -95,6 +95,7 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 	//   and the following is a good resource for the actual equation to implement (look at equation 
 	//   3.33
 	//   http://planning.cs.uiuc.edu/node99.html
+
 	double covx = 2 * std_landmark[0] * std_landmark[0];
 	double covy = 2 * std_landmark[1] * std_landmark[1];
 	double denom = sqrt(2 * M_PI * std_landmark[0] * std_landmark[1]);
@@ -104,7 +105,6 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 		double px = particles[i].x;
 		double py = particles[i].y;
 		double ptheta = particles[i].theta;
-		double prob = 1.0;
 
 		// transform vehicle coordinates to map coordinates
 		vector<LandmarkObs> map_obs;
@@ -125,7 +125,7 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 			double x = map_landmarks.landmark_list[j].x_f;
 			double y = map_landmarks.landmark_list[j].y_f;
 			int id = map_landmarks.landmark_list[j].id_i;
-			double err = ((x - px) * (x - px)) + ((y - py) * (y - py));
+			double err = sqrt(((x - px) * (x - px)) + ((y - py) * (y - py)));
 			if (err < sensor_range) {
 				LandmarkObs pred = {id, x, y};
 				predicted_landmarks.push_back(pred);
@@ -134,13 +134,16 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 
 		dataAssociation(predicted_landmarks, map_obs);
 
-		for (int j = 0; j < map_obs.size(); i++) {
-			double id = map_obs[j].id;
+		double prob = 1.0;
+		for (int j = 0; j < map_obs.size(); j++){
+			int id = map_obs[j].id;
 			double x = map_obs[j].x;
 			double y = map_obs[j].y;
-			double px = predicted_landmarks[id].x;
-			double py = predicted_landmarks[id].y;
-			double b = (((x - px) * (x - px)) / covx) + (((y - py) * (y - py)) / covy);
+			double predx = predicted_landmarks[id].x;
+			double predy = predicted_landmarks[id].y;
+			double dx = x - predx;
+			double dy = y - predy;
+			double b = ((dx * dx) / covx) + ((dy * dy) / covy);
 			prob *= (exp(-b) / denom);
 		}
 		particles[i].weight = prob;
