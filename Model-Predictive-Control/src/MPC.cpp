@@ -6,8 +6,21 @@
 using CppAD::AD;
 
 // TODO: Set the timestep length and duration
-size_t N = 10;
-double dt = 0.05;
+size_t N = 15;
+double dt = 0.06;
+
+size_t x_start = 0;
+size_t y_start = x_start + N;
+size_t psi_start = y_start + N;
+size_t v_start = psi_start + N;
+size_t cte_start = v_start + N;
+size_t epsi_start = cte_start + N;
+size_t delta_start = epsi_start + N;
+size_t a_start = delta_start + N - 1;
+
+double ref_cte = 0;
+double ref_epsi = 0;
+double ref_v = 50;
 
 // This value assumes the model presented in the classroom is used.
 //
@@ -19,26 +32,14 @@ double dt = 0.05;
 // presented in the classroom matched the previous radius.
 //
 // This is the length from front to CoG that has a similar radius.
-const double Lf = 2.67;
-
-double ref_cte = 0;
-double ref_epsi = 0;
-double ref_v = 60;
-
-size_t x_start = 0;
-size_t y_start = x_start + N;
-size_t psi_start = y_start + N;
-size_t v_start = psi_start + N;
-size_t cte_start = v_start + N;
-size_t epsi_start = cte_start + N;
-size_t delta_start = epsi_start + N;
-size_t a_start = delta_start + N - 1;
+// const double Lf = 2.67;
 
 class FG_eval {
  public:
   // Fitted polynomial coefficients
   Eigen::VectorXd coeffs;
-  FG_eval(Eigen::VectorXd coeffs) { this->coeffs = coeffs; }
+  double v, Lf;
+  FG_eval(Eigen::VectorXd coeffs, double v, double Lf) { this->coeffs = coeffs, this->v = v, this->Lf = Lf;}
 
   typedef CPPAD_TESTVECTOR(AD<double>) ADvector;
   void operator()(ADvector& fg, const ADvector& vars) {
@@ -134,9 +135,10 @@ class FG_eval {
 MPC::MPC() {}
 MPC::~MPC() {}
 
-vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
+vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs,
+vector<double> &mpc_x_vals, vector<double> &mpc_y_vals) {
   bool ok = true;
-  size_t i;
+  // size_t i;
   typedef CPPAD_TESTVECTOR(double) Dvector;
 
   double x = state[0];
@@ -151,7 +153,7 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   // element vector and there are 10 timesteps. The number of variables is:
   //
   // 4 * 10 + 2 * 9
-  size_t n_vars = 6 * N + 2 * (N - 1);
+  size_t n_vars = (6 * N) + (2 * (N - 1)) ;
   // TODO: Set the number of constraints
   size_t n_constraints = 6 * N;
 
@@ -209,8 +211,7 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   constraints_upperbound[cte_start] = cte;
   constraints_upperbound[epsi_start] = epsi;
 
-  // object that computes objective and constraints
-  FG_eval fg_eval(coeffs);
+  FG_eval fg_eval(coeffs, v, Lf);
 
   //
   // NOTE: You don't have to worry about these options

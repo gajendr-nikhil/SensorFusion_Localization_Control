@@ -70,6 +70,10 @@ int main() {
 
   // MPC is initialized here!
   MPC mpc;
+ 
+ // memory of previous actions
+ static double steer_value = 0.0;
+ static double throttle_value = 0.0;
 
   h.onMessage([&mpc](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                      uWS::OpCode opCode) {
