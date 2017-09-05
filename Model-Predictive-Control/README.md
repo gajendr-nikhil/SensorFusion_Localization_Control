@@ -2,6 +2,66 @@
 Self-Driving Car Engineer Nanodegree Program
 
 ---
+## Basic Build Instructions
+
+
+1. Clone this repo.
+2. Make a build directory: `mkdir build && cd build`
+3. Compile: `cmake .. && make`
+4. Run it: `./mpc`.
+
+[image1]: ./images/state.png "Vehicle state"
+
+## Model
+
+Model predictive control involves simulating different actuator inputs predicting the resulting trajectory and selecting the trajectory with minimum cost. We are using global kinematic model to achieve this. Kinematic models are simplifications of dynamic models that ignore tire forces, gravity, and mass.
+
+#### State of a vehicle
+State of a vechicle is represented by vehicle position (x, y), orientation, and velocity. If we know the current state of the vehicle we have to find what's its state in the future.
+
+| Vehicle state |
+|--------------------------------|
+|![alt text][image1]             | 
+
+The path planning block charts a reference trajectory (as a 3rd degree polynomial) using environmental model, the map, and vehicle location. Finally, the control loop applies the actuators, steering wheel and throttle/brake, to follow the reference trajectory to minimize the error between vehicle's actual path and the reference trajectory. We minimize this error by predicting the vehicle's actual path and adjusting the control inputs to minimize the difference between that prediction and reference trajectory.
+
+##### Cross Track Error
+If the vehicle is traveling down a straight road, then we can express the error between the center of the road and the vehicle's position as the cross track error.
+
+##### Orientation Error
+Difference between vechicle orientation and trajectory orientation.
+
+Ideally, both of these errors would be 0 - there would be no difference from the actual vehicle position and heading to the desired position and heading.
+
+#### Cost function
+Our cost should be a function of how far these errors are from 0. Cost function not only include the state, but also includes the control input. This allows us to penalize the magnitude of input as well as the change rate.
+
+### MPC algorithm
+Model predictive control uses an optimizer to find the control inputs and minimize the cost function. We execute only first set of control inputs. This brings vehicle to a new state and then you repeat the process. 
+
+#### MPC preprocessing
+Transform waypoints from map coordinates to vehicle coordinate system (car as origin)
+
+	1. Define the duration of trajector, T, by choosing N and dt.
+	2. We define vehicle model and constraints such as actuator limitations.
+	3. We define the cost function.
+	4. State feedback loop
+		* Pass the first state to MPC
+		* Optimization solver is called. Solver uses the initial state, model constraints and cost function to return a vector of control inputs that minimize the cost function. The solver we used is called IPOPT
+		* We apply the first control input to the vehicle.
+		* Repeat the loop.
+
+#### Latency
+In a real car, an actuation command won't execute instantly - there will be a delay as the command propagates through the system. This is a problem called "latency". Model Predictive Controller can adapt quite well because we can model this latency in the system. A latency of 100 milliseconds has been implemented in `main.cpp`
+
+##### Handle latency
+Predict the car's position, orientation, and velocity after the latency using car's current speed and position and previous steering angle and throttle input to feed it to MPC algorithm. This makes sure the MPC algorithm prediction is correct even with latency.
+
+### Timestep Length and Elapsed Duration (N & dt)
+N (Number of timesteps) & dt (timestep duration) represent horizon into to the future to predict actuator changes. 
+I started with predicting 4 seconds in future (N = 20 & dt = 0.2). I was able to get good results at 30mph speed. As the speed increased to 50 mph, prediction went wrong and car went off track because optimizer was looking too far ahead.
+I started reducing the N & dt. I tried 10 <= N <= 20 (step = 1) & 0.05 <= dt <= 0.08 (step = 0.01). Got the best and smooth driving result for N = 15 & dt = 0.06 with speed = 50 mph.
+
 
 ## Dependencies
 
@@ -52,80 +112,4 @@ Self-Driving Car Engineer Nanodegree Program
 * [Eigen](http://eigen.tuxfamily.org/index.php?title=Main_Page). This is already part of the repo so you shouldn't have to worry about it.
 * Simulator. You can download these from the [releases tab](https://github.com/udacity/self-driving-car-sim/releases).
 * Not a dependency but read the [DATA.md](./DATA.md) for a description of the data sent back from the simulator.
-
-
-## Basic Build Instructions
-
-
-1. Clone this repo.
-2. Make a build directory: `mkdir build && cd build`
-3. Compile: `cmake .. && make`
-4. Run it: `./mpc`.
-
-## Tips
-
-1. It's recommended to test the MPC on basic examples to see if your implementation behaves as desired. One possible example
-is the vehicle starting offset of a straight line (reference). If the MPC implementation is correct, after some number of timesteps
-(not too many) it should find and track the reference line.
-2. The `lake_track_waypoints.csv` file has the waypoints of the lake track. You could use this to fit polynomials and points and see of how well your model tracks curve. NOTE: This file might be not completely in sync with the simulator so your solution should NOT depend on it.
-3. For visualization this C++ [matplotlib wrapper](https://github.com/lava/matplotlib-cpp) could be helpful.
-
-## Editor Settings
-
-We've purposefully kept editor configuration files out of this repo in order to
-keep it as simple and environment agnostic as possible. However, we recommend
-using the following settings:
-
-* indent using spaces
-* set tab width to 2 spaces (keeps the matrices in source code aligned)
-
-## Code Style
-
-Please (do your best to) stick to [Google's C++ style guide](https://google.github.io/styleguide/cppguide.html).
-
-## Project Instructions and Rubric
-
-Note: regardless of the changes you make, your project must be buildable using
-cmake and make!
-
-More information is only accessible by people who are already enrolled in Term 2
-of CarND. If you are enrolled, see [the project page](https://classroom.udacity.com/nanodegrees/nd013/parts/40f38239-66b6-46ec-ae68-03afd8a601c8/modules/f1820894-8322-4bb3-81aa-b26b3c6dcbaf/lessons/b1ff3be0-c904-438e-aad3-2b5379f0e0c3/concepts/1a2255a0-e23c-44cf-8d41-39b8a3c8264a)
-for instructions and the project rubric.
-
-## Hints!
-
-* You don't have to follow this directory structure, but if you do, your work
-  will span all of the .cpp files here. Keep an eye out for TODOs.
-
-## Call for IDE Profiles Pull Requests
-
-Help your fellow students!
-
-We decided to create Makefiles with cmake to keep this project as platform
-agnostic as possible. Similarly, we omitted IDE profiles in order to we ensure
-that students don't feel pressured to use one IDE or another.
-
-However! I'd love to help people get up and running with their IDEs of choice.
-If you've created a profile for an IDE that you think other students would
-appreciate, we'd love to have you add the requisite profile files and
-instructions to ide_profiles/. For example if you wanted to add a VS Code
-profile, you'd add:
-
-* /ide_profiles/vscode/.vscode
-* /ide_profiles/vscode/README.md
-
-The README should explain what the profile does, how to take advantage of it,
-and how to install it.
-
-Frankly, I've never been involved in a project with multiple IDE profiles
-before. I believe the best way to handle this would be to keep them out of the
-repo root to avoid clutter. My expectation is that most profiles will include
-instructions to copy files to a new location to get picked up by the IDE, but
-that's just a guess.
-
-One last note here: regardless of the IDE used, every submitted project must
-still be compilable with cmake and make./
-
-## How to write a README
-A well written README file can enhance your project and portfolio.  Develop your abilities to create professional README files by completing [this free course](https://www.udacity.com/course/writing-readmes--ud777).
 
