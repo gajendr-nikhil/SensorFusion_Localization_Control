@@ -236,13 +236,11 @@ vector<double> &mpc_x_vals, vector<double> &mpc_y_vals) {
   //
   // {...} is shorthand for creating a vector, so auto x1 = {1.0,2.0}
   // creates a 2 element double vector.
-  vector<double> x1;
-  x1.push_back(solution.x[delta_start]);
-  x1.push_back(solution.x[a_start]);
-  for (int i = 0; i < N-1; i++)
-  {
-    x1.push_back(solution.x[x_start + i + 1]);
-    x1.push_back(solution.x[y_start + i + 1]);
+  mpc_x_vals.resize(N);
+  mpc_y_vals.resize(N);
+  for (int i = 0; i < N; i++) {
+    mpc_x_vals[i] = solution.x[x_start + i];
+    mpc_y_vals[i] = solution.x[y_start + i];
   }
-  return x1;
+  return {solution.x[delta_start], solution.x[a_start]};
 }
